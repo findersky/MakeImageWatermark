@@ -35,6 +35,7 @@ namespace Watermarker
             });
             img.Save(Guid.NewGuid().ToString()+".jpg",ImageFormat.Jpeg);
             img.Dispose();
+            watermark.Dispose();
             Console.WriteLine("处理完毕！");
             Console.Read();
         }
