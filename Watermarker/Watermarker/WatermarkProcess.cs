@@ -57,7 +57,7 @@ namespace Watermarker
                     PlaceImageWatermark(destBitmap, watermarkBitmap.Value, currentSettings);
                 }
 
-                sourceImage.Dispose();
+                sourceImage?.Dispose();
                 return destBitmap;
             }
             return sourceImage;
@@ -74,6 +74,15 @@ namespace Watermarker
             currentSettings = currentSettings ?? new WatermarkSettings();
             using (Graphics g = Graphics.FromImage(destBitmap))
             {
+                Bitmap rotateImage = null;
+                if (currentSettings.ImageRotatedDegree > 0)
+                {
+                    rotateImage=GetRotateImage(watermarkBitmap, currentSettings.ImageRotatedDegree);
+                }
+                if (rotateImage != null)
+                {
+                    watermarkBitmap = rotateImage;
+                }
                 double watermarkSizeInPercent = (double)currentSettings.PictureSettings.Size / 100;
 
                 Size boundingBoxSize = new Size((int)(destBitmap.Width * watermarkSizeInPercent),
@@ -124,6 +133,9 @@ namespace Watermarker
         {
             using (Graphics g = Graphics.FromImage(sourceBitmap))
             {
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.CompositingQuality = CompositingQuality.HighQuality;
+                g.InterpolationMode = InterpolationMode.Default;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.TextRenderingHint = TextRenderingHint.AntiAlias;
 
@@ -180,10 +192,88 @@ namespace Watermarker
             destBitmap.SetResolution(sourceImage.HorizontalResolution, sourceImage.VerticalResolution);
             using (Graphics g = Graphics.FromImage(destBitmap))
             {
+                g.CompositingQuality = CompositingQuality.HighQuality;
+                g.InterpolationMode = InterpolationMode.Default;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.DrawImage(sourceImage, 0, 0);
             }
             return destBitmap;
+        }
+
+        /// <summary>
+        /// 计算矩形绕中心任意角度旋转后所占区域矩形宽高
+        /// </summary>
+        /// <param name="width">原矩形的宽</param>
+        /// <param name="height">原矩形高</param>
+        /// <param name="angle">顺时针旋转角度</param>
+        /// <returns></returns>
+        public Rectangle GetRotateRectangle(int width, int height, float angle)
+        {
+            double radian = angle * Math.PI / 180; ;
+            double cos = Math.Cos(radian);
+            double sin = Math.Sin(radian);
+            int newWidth = (int)(Math.Max(Math.Abs(width * cos - height * sin), Math.Abs(width * cos + height * sin)));
+            int newHeight = (int)(Math.Max(Math.Abs(width * sin - height * cos), Math.Abs(width * sin + height * cos)));
+            return new Rectangle(0, 0, newWidth, newHeight);
+        }
+        /// <summary>
+        /// 获取原图像绕中心任意角度旋转后的图像
+        /// </summary>
+        /// <param name="rawImg"></param>
+        /// <param name="angle"></param>
+        /// <returns></returns>
+        public Bitmap GetRotateImage(Bitmap srcImage, int angle)
+        {
+            angle = angle % 360;
+            //原图的宽和高
+            int srcWidth = srcImage.Width;
+            int srcHeight = srcImage.Height;
+            //图像旋转之后所占区域宽和高
+            Rectangle rotateRec = GetRotateRectangle(srcWidth, srcHeight, angle);
+            int rotateWidth = rotateRec.Width;
+            int rotateHeight = rotateRec.Height;
+            //目标位图
+            Bitmap destImage = null;
+            Graphics graphics = null;
+            try
+            {
+                //定义画布，宽高为图像旋转后的宽高
+                destImage = new Bitmap(rotateWidth, rotateHeight);
+                //graphics根据destImage创建，因此其原点此时在destImage左上角
+                graphics = Graphics.FromImage(destImage);
+                //要让graphics围绕某矩形中心点旋转N度，分三步
+                //第一步，将graphics坐标原点移到矩形中心点,假设其中点坐标（x,y）
+                //第二步，graphics旋转相应的角度(沿当前原点)
+                //第三步，移回（-x,-y）
+                //获取画布中心点
+                Point centerPoint = new Point(rotateWidth / 2, rotateHeight / 2);
+                //将graphics坐标原点移到中心点
+                graphics.TranslateTransform(centerPoint.X, centerPoint.Y);
+                //graphics旋转相应的角度(绕当前原点)
+                graphics.RotateTransform(angle);
+                //恢复graphics在水平和垂直方向的平移(沿当前原点)
+                graphics.TranslateTransform(-centerPoint.X, -centerPoint.Y);
+                //此时已经完成了graphics的旋转
+
+                //计算:如果要将源图像画到画布上且中心与画布中心重合，需要的偏移量
+                Point Offset = new Point((rotateWidth - srcWidth) / 2, (rotateHeight - srcHeight) / 2);
+                //将源图片画到rect里（rotateRec的中心）
+                graphics.DrawImage(srcImage, new Rectangle(Offset.X, Offset.Y, srcWidth, srcHeight));
+                //重至绘图的所有变换
+                graphics.ResetTransform();
+                graphics.Save();
+            }
+            catch (Exception ex)
+            {
+                //throw ex;
+                destImage = null;
+
+            }
+            finally
+            {
+                    graphics?.Dispose();
+            }
+            return destImage;
         }
 
         /// <summary>

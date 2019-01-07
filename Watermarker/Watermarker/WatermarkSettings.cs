@@ -48,6 +48,11 @@ namespace Watermarker
         public bool WatermarkPictureEnable { get; set; } = false;
 
         /// <summary>
+        /// 设置图像旋转
+        /// </summary>
+        public int ImageRotatedDegree { get; set; } = 0;
+
+        /// <summary>
         /// 图片水印的公共设置
         /// </summary>
         public CommonSettings PictureSettings { get; set; } = new CommonSettings();
